@@ -5,6 +5,7 @@
 (define-constant ERR-ALREADY-GUARDIAN (err u101))
 (define-constant ERR-NOT-ENOUGH-GUARDIANS (err u102))
 (define-constant ERR-RECOVERY-ACTIVE (err u103))
+(define-constant ERR-INVALID-PRINCIPAL (err u104))
 (define-constant MIN-GUARDIAN-THRESHOLD u2)
 
 ;; Data vars
@@ -28,11 +29,18 @@
 (define-read-only (get-recovery-state)
     (var-get recovery-state))
 
+;; Helper functions
+(define-private (validate-principal (address principal))
+    (match (principal-destruct? address)
+        success true
+        error false))
+
 ;; Public functions
 (define-public (add-guardian (new-guardian principal))
     (begin
         (asserts! (is-eq tx-sender (var-get owner)) ERR-NOT-AUTHORIZED)
         (asserts! (not (is-guardian new-guardian)) ERR-ALREADY-GUARDIAN)
+        (asserts! (validate-principal new-guardian) ERR-INVALID-PRINCIPAL)
         (map-set guardians new-guardian true)
         (map-set guardian-count u0 
             (+ (default-to u0 (map-get? guardian-count u0)) u1))
@@ -54,6 +62,7 @@
         (asserts! (>= (default-to u0 (map-get? guardian-count u0)) 
                      MIN-GUARDIAN-THRESHOLD)
                  ERR-NOT-ENOUGH-GUARDIANS)
+        (asserts! (validate-principal new-owner) ERR-INVALID-PRINCIPAL)
         (var-set recovery-state true)
         (var-set recovery-deadline (+ block-height u144))
         (var-set proposed-owner (some new-owner))
@@ -76,6 +85,7 @@
         (begin
             (asserts! (var-get recovery-state) ERR-NOT-AUTHORIZED)
             (asserts! (>= votes MIN-GUARDIAN-THRESHOLD) ERR-NOT-ENOUGH-GUARDIANS)
+            (asserts! (validate-principal proposed) ERR-INVALID-PRINCIPAL)
             (var-set owner proposed)
             (var-set recovery-state false)
             (var-set proposed-owner none)
